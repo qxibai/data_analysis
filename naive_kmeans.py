@@ -1,3 +1,10 @@
+# Kmeans算法思想如下
+# 选取数据空间中的K个对象作为初始中心，每个对象代表一个聚类中心；
+# 对于样本中的数据对象，根据它们与这些聚类中心的欧式距离，按距离最近的准则将它们分到距离它们最近的聚类中心。
+# 对于所有已经被标记（分类）的点，重新计算类均值（例如所有标记为i的样本的每个特征的均值，将所计算得到的均值作为新的类中心），并计算目标函数的值。
+# 判断聚类中心和目标函数的值是否发生改变，若不变，则输出结果，若改变，则返回2）
+
+
 # /Users/laisenying/Documents/数据挖掘源文件/MachineLearningInAction/Ch10/testSet.txt
 import numpy as np
 import matplotlib.pyplot as plt

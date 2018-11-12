@@ -11,7 +11,7 @@ class KdNode():
         self.left = left  # 该结点分割超平面左子空间构成的Kd_tree
         self.right = right  # 该结点分割超平面右子空间构成的Kd_tree
 
-class KdTree():
+class build_KdTree():
     def __init__(self, data):
         # k为数据维度
         self.k = len(data[0])

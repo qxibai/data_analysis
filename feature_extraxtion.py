@@ -86,9 +86,9 @@ class FeatureExtraction():
         # 调用eig()计算特征值和特征向量
         # 对特征值排序, 从大到小
         eig_index = np.argsort(-eig(inv_m)[0])
-        eig_vector = eig(inv_m)[1][eig_index]
         # 要注意这里得出来的特征向量是一列一列的
-        eig_vector = eig_vector.T
+        eig_vector = eig(inv_m)[1].T
+        eig_vector = eig_vector[eig_index]
         eig_value = eig(inv_m)[0][eig_index]
         return eig_value, eig_vector
 
@@ -103,8 +103,8 @@ class FeatureExtraction():
         data_trans = np.mat(eig_vector_choice) * np.mat(self.data.T)
         data_trans = data_trans.T
         data_trans = data_trans.A
-        #print("线性变换矩阵为："+ str(eig_vector_choice)+'\n')
-        #print("线性变换后数据矩阵变为："+str(data_trans)+'\n')
+        print("线性变换矩阵为："+ str(eig_vector_choice)+'\n')
+        print("线性变换后数据矩阵变为："+str(data_trans)+'\n')
         return eig_value_choice, eig_vector_choice, data_trans
 
     def draw_picture(self, cars_label):
@@ -151,8 +151,8 @@ if __name__ == "__main__":
     # 将data3的run_id index修改为样本名
     data_T.index = meta2['sample_name']
     # 对数据特征进行筛选，过滤掉小于0.001的特征
-    data_T = data_T[data_T.columns[data_T.sum() > 0.0001]]
-    data_T = data_T[data_T.columns[data_T.sum() < 0.001]]
+    data_T = data_T[data_T.columns[data_T.sum() > 0.1]]
+    data_T = data_T[data_T.columns[data_T.sum() < 0.4]]
     print("过滤后特征数量为：" + str(len(data_T.columns)))
     # 提取数据矩阵，每一行构成一个特征向量（一个样本）
     data_A = np.array(data_T)

@@ -89,9 +89,96 @@ class klt_mean():
         J_decision = self.J_choice()
         eig_value, eig_vector = self.eig_Sw()
         index = np.argsort(-J_decision)
-        eig_vector_choice = eig_vector[index]
+        eig_vector_choice = eig_vector[index][:self.d]
         data_trans = np.mat(eig_vector_choice) * self.data.T
         data_trans = np.array(data_trans.T)
+        return data_trans
+
+# 类中心化特征向量中分类信息的提取，相当于基于类方差来提取信息
+class klt_var():
+    def __init__(self, data, label, d):
+        '''
+
+        :param data: 输入的数据矩阵，m*n array，每一行为一个样本
+        :param label: 类别标签，m*1 array
+        :param d: 想要提取的特征维度
+        '''
+        self.data = data
+        self.label = label
+        self.d = d
+
+    # 计算Pi,Pj, 保存类别的概率
+    def LabelPossibility(self):
+        m = len(self.label)
+        label_stats = pd.value_counts(pd.Series(self.label))
+        Pi = {}
+        for i in range(len(label_stats)):
+            # 要注意这里的索引需要用index的名字, index为类名
+            index = label_stats.index[i]
+            Pi[index] = label_stats[index]/m
+        return Pi
+
+    # 计算每一类的均值向量以及总的均值向量
+    def Class_mean(self):
+        Pi = self.LabelPossibility()
+        mean_i = {}
+        mean_all = np.zeros(self.data.shape[1])
+        for index in Pi.keys():
+            # 注意这里的label需要为array类型
+            mean_i[index] = self.data[self.label == index].mean(axis=0)
+            mean_all += Pi[index] * mean_i[index]
+        # mean_i为字典类型，mean_all为array类型
+        return mean_i, mean_all
+
+    # 计算类内离散度矩阵Sw，Sw作为K-L变换的产生矩阵
+    def in_matrix(self):
+        mean_i, mean_all = self.Class_mean()
+        Pi = self.LabelPossibility()
+        # 计算每一类的(xk-mi)(xk-mi)^T之和
+        # class_number: 类别数量
+        Sw = np.zeros([self.data.shape[1], self.data.shape[1]])
+        for index in Pi.keys():
+            data_i = self.data[self.label == index]
+            Sw_index = np.zeros([self.data.shape[1], self.data.shape[1]])
+            for i in range(len(data_i)):
+                Sw_index += np.mat(data_i[i]-mean_i[index]).T * np.mat(data_i[i]-mean_i[index])
+            Sw_index = Pi[index] * Sw_index/(len(data_i)-1)
+            Sw += Sw_index
+        return Sw
+
+    # 计算类内离散度矩阵Sw的特征值和特征向量
+    def eig_Sw(self):
+        Sw = self.in_matrix()
+        eig_value = eig(Sw)[0]
+        eig_vector = eig(Sw)[1].T
+        return eig_value, eig_vector
+
+    # 评估特征分类性能，这里以总体所熵来评估
+    def data_transformation(self):
+        eig_value, eig_vector = self.eig_Sw()
+        print(eig_value[1])
+        # data_trans为每一列为一个样本,每一行为一个特征
+        data_trans = np.mat(eig_vector) * np.mat(self.data).T
+        Pi = self.LabelPossibility()
+        # 用于存储每一个判据的分类性能
+        J_choice = np.zeros(len(data_trans))
+        # 遍历每一个特征
+        for j in range(len(data_trans)):
+            r_ij = 0
+            # 遍历每一个分类
+            for i in Pi.keys():
+                data_j = data_trans[j]
+                data_ij = data_j[:, self.label == i]  # 第i类的第j个特征的数据集
+                a = rij = Pi[i]*np.var(data_ij, ddof=1)
+                b = eig_value[j]
+                rij = a/b
+                r_ij -= rij*np.log10(rij)
+            J_choice[j] = r_ij
+        index = np.argsort(J_choice)
+        eig_vector_choice = eig_vector[index][:self.d]
+        data_trans = np.mat(eig_vector_choice)*np.mat(self.data).T
+        data_trans = data_trans.T
+        data_trans = data_trans.A
         return data_trans
 
 
@@ -138,6 +225,22 @@ if __name__ == "__main__":
         else:
             cars_label.append(1)
     cars_label = np.array(cars_label)
+
+    kl1 = klt_var(data_A, label, 2)
+    data_trans = kl1.data_transformation()
+    plt.figure()
+    axes = plt.subplot(111)
+    type1 = axes.scatter(data_trans[label == 0][:, 0], data_trans[label == 0][:, 1], color="green", label='Health')
+    type2 = axes.scatter(data_trans[cars_label == 2][:, 0],
+                         data_trans[cars_label == 2][:, 1], 30, color="red", marker='o', label='low')
+    type3 = axes.scatter(data_trans[cars_label == 3][:, 0],
+                         data_trans[cars_label == 3][:, 1], 40, color="red", marker='<', label='moderate')
+    type4 = axes.scatter(data_trans[cars_label == 4][:, 0],
+                         data_trans[cars_label == 4][:, 1], 50, color="red", marker='s', label='severe')
+    plt.legend((type1, type2, type3, type4), ('Health', 'low', 'moderate', 'severe'))
+    plt.xlabel("PC1")
+    plt.ylabel("PC2")
+    plt.show()
     kl1 = klt_mean(data_A, label, 2)
     data_trans = kl1.data_transformation()
     plt.figure()

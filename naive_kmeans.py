@@ -21,6 +21,13 @@ def euclidean_distance(dataset, one_sample):
 
 class Kmeans():
     def __init__(self, k, dataMat, max_iterations, diff):
+        '''
+
+        :param k: 想要聚类的数量
+        :param dataMat: 数据矩阵，m*n的array，m个样本,n个特征
+        :param max_iterations: 所允许的最大迭代次数
+        :param diff: 精度，即聚类停止条件
+        '''
         self.k = k
         self.dataMat = dataMat
         self.max_iterations = max_iterations
@@ -40,12 +47,12 @@ class Kmeans():
     def rand_oneCent(self):
         rows = self.dataMat.shape[0] # 读取矩阵的行数，即点的数量
         n = np.random.randint(rows) # 随机选取一行
-        return dataMat[n, :]
+        return self.dataMat[n, :]
 
     # 根据获得的第一个初始坐标，选取初始化的k个质心
     # rand_onecent为初始化的第一个质心的坐标
     def rand_kCent(self, rand_onecent):
-        rows, columns = dataMat.shape  # 获得训练集矩阵的行和列数
+        rows, columns = self.dataMat.shape  # 获得训练集矩阵的行和列数
         Kcent = np.zeros((self.k, columns))  # 建立K*d维矩阵
         Kcent[0, :] = rand_onecent  # 获得初始质心坐标,并存储在Kcent中
         for i in range(self.k - 1):
@@ -108,7 +115,8 @@ class Kmeans():
         # 返回最终归类的类标签列表，以及质心坐标
         return label, Kcent, time
 
-if __name__ == "__main__":
+# 测试
+def main():
     def txt_to_mat(filename):
         fr = open(filename, 'r')
         lines = fr.readlines()
@@ -131,9 +139,17 @@ if __name__ == "__main__":
     # kmeans算法执行
     test1 = Kmeans(4, dataMat, 1000000000, 0.0000000001)
     label, Kcent, time = test1.predict()
+    print(label)
     #绘图
     plt.figure()
     for i in range(len(label)):
         plt.scatter(dataMat[label == i][:, 0], dataMat[label == i][:, 1])
     plt.scatter(Kcent[:, 0], Kcent[:, 1],color="black", s=35)
     plt.show()
+
+
+if __name__ == "__main__":
+    main()
+
+
+

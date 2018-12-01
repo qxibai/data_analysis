@@ -3,7 +3,8 @@
 import pandas as pd
 import numpy as np
 from time import clock
-from collections import Counter
+import copy
+
 '''
 实现随机森林CART分类树建立，并对特征的重要性进行评估
 特征重要性评估基于基尼指数
@@ -114,7 +115,7 @@ class CartTree:
         # 首先对data选择划分的最优特征，最优切分点，以及划分后计算得到的gini指数
         best_feature, best_split, now_gini = self.best_js(data, label)
         if (current_gini - now_gini) > self.thread:
-            print(best_feature)
+            # print(best_feature)
             self.feature_importance[best_feature] = 0
             data_left, label_left = data[data[best_feature]>=best_split], label[data[best_feature]>=best_split]
             data_right, label_right = data[data[best_feature]<best_split], label[data[best_feature]<best_split]
@@ -229,22 +230,19 @@ class CartTree:
         best_error_rate = self.test(cart_tree)
         best_alpha = 0
         best_tree_index = 0
+        best_tree = copy.deepcopy(cart_tree)
         for i in range(len(self.alpha)-1):
-            T_tree = self.generate_child_tree(self.alpha[i+1], cart_tree)
-            error_rate = self.test(T_tree)
+            tree = self.generate_child_tree(self.alpha[i+1], cart_tree)
+            error_rate = self.test(tree)
             if error_rate < best_error_rate:
                 best_error_rate = error_rate
                 best_tree_index = i+1
+                best_tree = copy.deepcopy(cart_tree)
                 best_alpha = self.alpha[i+1]
         print("最优的cart树为T" + str(best_tree_index))
         print("该验证数据的错误率为："+str(best_error_rate))
         print("alpha:" + str(best_alpha))
-        cart_tree = self.build_tree(self.train_data, self.train_label)
-        if best_alpha == 0:
-            best_tree = cart_tree
-        else:
-            self.generate_child_tree(best_alpha, cart_tree)
-            best_tree = cart_tree
+        # search_cart_tree(best_tree)
         return best_tree
 
     def cal_feature_importance(self, best_tree):
@@ -286,7 +284,7 @@ def search_cart_tree(cart_tree):
 
 
 class RandomForest():
-    def __init__(self, data, label, number, features=0.8, frac=0.7, thread=0.0):
+    def __init__(self, data, label, number=10, features=0.8, frac=0.9, thread=0.0):
         self.data = data
         self.label = label
         self.number = number
@@ -305,13 +303,15 @@ class RandomForest():
 
     def sampling(self):
         for i in range(self.number):
-            train_data = self.data.sample(frac=1.0, replace=True, random_state=0, axis=0)  #有放回抽样抽取全部
-            train_data = self.data.sample(frac=self.frac, replace=False, random_state=0, axis=0)
-            train_data = train_data.sample(frac=self.features, replace=False, random_state=0, axis=1)
+            # 将数据集分成测试集与训练集7：3
+            train_data = self.data.sample(frac=0.7, replace=False, random_state=1)
             train_label = self.label.iloc[train_data.index]
-            test_data = self.data.iloc[list(set(self.data.index)-set(train_data.index))]
-            test_data = test_data[train_data.columns]
+            test_data = self.data.iloc[list(set(self.data.index) - set(train_data.index))]
             test_label = self.label.iloc[test_data.index]
+            # 随机采样生成不同的测试集
+            train_data = train_data.sample(frac=self.frac, replace=True)
+            train_data = train_data.sample(frac=self.features, replace=False, axis=1)
+            train_label = train_label.loc[train_data.index]
             print("正在生成CartTree......")
             build_tree = CartTree(train_data, train_label, test_data, test_label, self.thread)
             best_tree = build_tree.pruning()
@@ -356,17 +356,18 @@ class RandomForest():
             self.embedding_CartTree[i].cal_feature_importance(self.embedding_tree[i])
             for index in self.embedding_CartTree[i].feature_importance.keys():
                 importance_list[index] += self.embedding_CartTree[i].feature_importance[index]
-        importance_list = Counter(importance_list)  # 从大到小排序
         sums = sum(importance_list.values())
         # 归一化评估重要性
         for index in importance_list.keys():
             importance_list[index] = importance_list[index]/sums
-        importance_list = pd.DataFrame(importance_list)
+        importance_list = pd.Series(importance_list)
+        importance_list = importance_list.sort_values(ascending=False)
         print("特征重要性程度为：" + str(importance_list))
         return importance_list
 
 
 def main():
+    """
     #测试数据获取 每一行为一个样本 第一列为分类标签
     url = 'http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data'
     df = pd.read_csv(url, header=None)
@@ -376,18 +377,53 @@ def main():
                   'Color intensity', 'Hue', 'OD280/OD315 of diluted wines', 'Proline']
     data = df.iloc[:, 1:]
     label = df.iloc[:, 0]
-    '''
-    train_df = df.sample(frac=0.7, replace=False, random_state=1, axis=0)
-    test_df = df.iloc[list(set(df.index) - set(train_df.index))]
-    train_data, train_label = train_df.iloc[:, 1:], train_df.iloc[:, 0]
-    test_data, test_label = test_df.iloc[:, 1:], test_df.iloc[:, 0]
-    new = CartTree(train_data, train_label, test_data, test_label)
-    best_tree = new.pruning()
-    new.cal_feature_importance(best_tree)
-    print(new.feature_importance)
-    search_cart_tree(best_tree)
-    '''
-    forest = RandomForest(data, label, number=10, features=0.8, frac=0.7, thread=0)
+    # train_df = df.sample(frac=0.7, replace=False, random_state=1, axis=0)
+    # test_df = df.iloc[list(set(df.index) - set(train_df.index))]
+    # train_data, train_label = train_df.iloc[:, 1:], train_df.iloc[:, 0]
+    # test_data, test_label = test_df.iloc[:, 1:], test_df.iloc[:, 0]
+    # new = CartTree(train_data, train_label, test_data, test_label)
+    # best_tree = new.pruning()
+    # new.cal_feature_importance(best_tree)
+    # print(new.feature_importance)
+    # search_cart_tree(best_tree)
+    forest = RandomForest(data, label, number=1000, features=0.8, frac=0.7, thread=0)
+    forest.sampling()
+    forest.feature_importance_evaluation()
+    """
+
+    # 数据读取与处理，对数据进行分类读取，并转换为数据矩阵，每一行为一个特征向量
+    data = pd.read_csv("genus_relative_abundance.csv")
+    meta = pd.read_csv("PRJ355023_meta.csv")
+    # 删除掉数据的第一列
+    data2 = data.iloc[:, 2:]
+    # 将属的名字作为每一行的index
+    data2.index = data['Genus_absolute_bundance']
+    # 将run_id作为meta文件的index
+    meta.index = meta['run_id']
+    # 去掉空的序列
+    data3 = data2[data2.columns[data2.sum() > 0]]
+    # 对数据进行转置换，此时变为每一行为一个样本
+    data_T = data3.T
+    # 依据run_id对meta进行过滤和重排, 要注意loc是针对label进行定位的,而iloc则是针对多少行多少列定位的
+    meta2 = meta.loc[data_T.index, :]
+    # 将data3的run_id index修改为样本名
+    data_T.index = meta2['sample_name']
+    # 保留至少在5个样本中存在的特征
+    data_T = data_T[data_T.columns[np.sum(data_T == 0) <= 0.9*len(data_T)]]
+    # 对数据特征进行筛选，过滤掉小于0.001的特征
+    # data_T = data_T[data_T.columns[data_T.sum() >= 0.01]]
+    print(data_T.columns)
+    print("过滤后特征数量为：" + str(len(data_T.columns)))
+    # 样本类别储存
+    label = np.zeros(len(data_T))
+    for i in range(len(data_T)):
+        if meta2['disease'][i] == 'ASD':
+            label[i] = 1
+        else:
+            label[i] = 0
+    label = pd.Series(label)
+    data_T.index = label.index
+    forest = RandomForest(data_T, label, number=5)
     forest.sampling()
     forest.feature_importance_evaluation()
 
